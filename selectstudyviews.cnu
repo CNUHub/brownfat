@@ -1,0 +1,368 @@
+// iiVBshScript
+// Version 1.183
+
+// this script helps look at, verify, compare images from different PET/CT processing steps
+// directories and study list need to be modified for different studies and environments
+
+petcm = newFileObject("/data/luria/lookup/iiVlookups/lookup.lkup", iiv.io.AnalyzeColorMap, "/data/luria/lookup/iiVlookups/lookup.lkup");
+ctcm=iiv.display.GreyColorModel.getGreyColorModel();
+regcm = newFileObject("/data/luria/lookup/iiVlookups/highcontrastrandomlkup.cnu", iiv.display.CNUColorModel, "/data/luria/lookup/iiVlookups/highcontrastrandomlkup.cnu");
+
+petscale = new iiv.data.CNUScale(1.0);
+ctscale = new iiv.data.CNUScale(1.0);
+regscale = new iiv.data.CNUScale(1.0);
+petoverlayminvalue=4000d;
+showpointcontroller = CNUVIEWER.getShowPointController();
+showpointcontroller.setMapTracking(true);
+
+addClassPath("/data/luria/experiments/brownfat/scripts");  // If it's not already in our classpath
+importCommands("/beanshellcmds");
+
+public class ListValues {
+  public String study;
+  public String topseries;
+  public String topmap;
+  public String bottomseries;
+  public String bottomext;
+  public String bottommap;
+  public iiv.display.CNUColorModel bottomcm;
+  public void ListValues(String study, String topseries, String topmap,
+                         String bottomseries, String bottommap) {
+    this.study = study;
+    this.topseries=topseries;
+    this.topmap=topmap;
+    this.bottomseries=bottomseries;
+    this.bottommap=bottommap;
+  };
+  public String toString() {
+    return study + " " + topseries + " " + bottomseries;
+  };
+};
+
+ListValues[] listValues = new ListValues[]{
+// 1
+  new ListValues( "E00101","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E00102","s102","s102_orig.map","s2","s102_orig.map" ),
+// 3
+  new ListValues( "E00301","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E00302","s102","s102_orig.map","s2","s102_orig.map" ),
+// 6
+  new ListValues( "E00601","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E00602","s102","s102_orig.map","s2","s102_orig.map" ),
+// 7
+  new ListValues( "E00701","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E00702","s102","s102_orig.map","s2","s102_orig.map" ),
+// 8
+  new ListValues( "E00801","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E00802","s102","s102_orig.map","s2","s102_orig.map" ),
+// 9
+  new ListValues( "E00901","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E00902","s102","s102_orig.map","s2","s102_orig.map" ),
+// 10
+  new ListValues( "E01001","s102","s102_orig.map","s3","s102_orig.map" ),
+  new ListValues( "E01002","s102","s102_orig.map","s2","s102_orig.map" ),
+// 11
+  new ListValues( "E01101","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E01102","s102","s102_orig.map","s2","s102_orig.map" ),
+// 12
+  new ListValues( "E01201","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E01202","s102","s102_orig.map","s2","s102_orig.map" ),
+// 14
+  new ListValues( "E01401","s103","s103_orig.map","s2","s103_orig.map" ),
+  new ListValues( "E01402","s102","s102_orig.map","s2","s102_orig.map" ),
+// 20
+  new ListValues( "E02001","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E02002","s102","s102_orig.map","s2","s102_orig.map" ),
+// 21
+  new ListValues( "E02101","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E02102","s103","s103_orig.map","s2","s103_orig.map" ),
+// 22
+  new ListValues( "E02201","s102","s102_orig.map","s2","s102_orig.map" ),
+// 23
+  new ListValues( "E02301","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E02302","s102","s102_orig.map","s2","s102_orig.map" ),
+ // 24
+  new ListValues( "E02401","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E02402","s102","s102_orig.map","s2","s102_orig.map" ),
+ // 25
+  new ListValues( "E02501","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E02502","s103","s103_orig.map","s2","s103_orig.map" ),
+ // 26
+  new ListValues( "E02601","s102","s102_orig.map","s2","s102_orig.map" ),
+ // 27
+  new ListValues( "E02701","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E02702","s102","s102_orig.map","s2","s102_orig.map" ),
+ // 29
+  new ListValues( "E02901","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E02902","s102","s102_orig.map","s2","s102_orig.map" ),
+ // 30
+  new ListValues( "E03001","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E03002","s102","s102_orig.map","s2","s102_orig.map" ),
+// 35
+  new ListValues( "E03501","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E03502","s102","s102_orig.map","s2","s102_orig.map" ),
+// 36
+  new ListValues( "E03601","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E03602","s102","s102_orig.map","s2","s102_orig.map" ),
+// 37
+  new ListValues( "E03701","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E03702","s102","s102_orig.map","s2","s102_orig.map" ),
+// 38
+  new ListValues( "E03801","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E03802","s102","s102_orig.map","s2","s102_orig.map" ),
+// 39
+  new ListValues( "E03901","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E03902","s102","s102_orig.map","s2","s102_orig.map" ),
+// 41
+  new ListValues( "E04101","s102","s102_orig.map","s2","s102_orig.map" ),
+  new ListValues( "E04102","s102","s102_orig.map","s2","s102_orig.map" ),
+};
+
+button = new javax.swing.JButton("Display Selected");
+modecombobox = new javax.swing.JComboBox(new String[] {"Top only", "Bottom only", "Top & Bottom", "Top over Bottom"});
+// max projections useful for finding brain extents
+typecombobox = new javax.swing.JComboBox(new String[] {"Single Slice", "Max Projection"});
+viewcombobox = new javax.swing.JComboBox(new String[] {"Coronal", "Sagittal", "Transverse", "All Ortho Views"});
+crosstrackcombobox = new javax.swing.JComboBox(new String[] {"Crosshairs/Tracking", "Crosshairs", "Tracking", "no crosshairs" });
+topcolormapcombobox = new javax.swing.JComboBox(new String[] {"lookup", "region", "grey"});
+bottomcolormapcombobox = new javax.swing.JComboBox(new String[] {"lookup", "region", "grey"});
+
+// directory comboboxes contain subdirectories under each subject directory where processing steps create files 
+topdircombobox = new javax.swing.JComboBox(new String[] {"combined_originals/","flirt/","templated/","normalized/"});
+bottomdircombobox = new javax.swing.JComboBox(new String[] {"combined_originals/","flirt/","templated/","normalized/"});
+
+// extension comboboxes contain list of file extensions from different processing steps
+topextcombobox = new javax.swing.JComboBox(new String[] {"","_noring","_noring_gs1p5","_nrm20k","_nrm20k_tmplt","_nrm20k_adiposeonly","_nrm20k_nobrain","_nrm20k_noface_adipose","_gs1p5_nrm20k","_gs1p5_nrm20k_tmplt","_gs1p5_nrm20k_nobrain","_gs1p5_nrm20k_adiposeonly","_gs1p5_nrm20k_noface_adipose","_in_pet_space_viaflirt"});
+bottomextcombobox = new javax.swing.JComboBox(new String[] {"","_noring","_noring_gs1p5","_nrm20k","_nrm20k_tmplt","_nrm20k_adiposeonly","_nrm20k_nobrain","_nrm20k_noface_adipose","_gs1p5_nrm20k","_gs1p5_nrm20k_tmplt","_gs1p5_nrm20k_nobrain","_gs1p5_nrm20k_adiposeonly","_gs1p5_nrm20k_noface_adipose","_in_pet_space_viaflirt"});
+
+
+jlist = new javax.swing.JList(listValues);
+
+listDialog = new javax.swing.JDialog() {
+    super(CNUVIEWER.getParentFrame(), "select views 2 dialog", false);   
+    JScrollPane scrollPane = new JScrollPane();
+    scrollPane.getViewport().setView(jlist);
+    box = javax.swing.Box.createVerticalBox();
+    box.add(scrollPane);
+    box.add(modecombobox);
+    box.add(typecombobox);
+    box.add(viewcombobox);
+    hbox = javax.swing.Box.createHorizontalBox();
+    hbox.add(new javax.swing.JLabel("Top color model:  "));
+    hbox.add(topcolormapcombobox);
+    box.add(hbox);
+    hbox = javax.swing.Box.createHorizontalBox();
+    hbox.add(new javax.swing.JLabel("Bottom color model:  "));
+    hbox.add(bottomcolormapcombobox);
+    box.add(hbox);
+
+    hbox = javax.swing.Box.createHorizontalBox();
+    hbox.add(new javax.swing.JLabel("Top file subdirectory:  "));
+    hbox.add(topdircombobox);
+    box.add(hbox);
+    hbox = javax.swing.Box.createHorizontalBox();
+    hbox.add(new javax.swing.JLabel("Bottom file subdirectory:  "));
+    hbox.add(bottomdircombobox);
+    box.add(hbox);
+
+    hbox = javax.swing.Box.createHorizontalBox();
+    hbox.add(new javax.swing.JLabel("Top file ext:  "));
+    hbox.add(topextcombobox);
+    box.add(hbox);
+    hbox = javax.swing.Box.createHorizontalBox();
+    hbox.add(new javax.swing.JLabel("Bottom file ext:  "));
+    hbox.add(bottomextcombobox);
+    box.add(hbox);
+    box.add(crosstrackcombobox);
+    box.add(button);
+    getContentPane().add(box);
+    this.pack();
+};
+
+actionlistener = new java.awt.event.ActionListener() {
+    public void actionPerformed(java.awt.event.ActionEvent e) {
+      actionlist = jlist.getSelectedValues();
+      grouplocations = new java.util.Vector();
+      grouplocations.addElement(new java.awt.Point(0,0));
+      grouplocations.addElement(new java.awt.Point(0,0));
+
+      selectedindex = modecombobox.getSelectedIndex();
+      modeMode="top";
+      if(selectedindex == 1) modeMode="bottom";
+      else if(selectedindex == 2) modeMode="both";
+      else if(selectedindex == 3) modeMode="topoverlaybottom";
+
+      selectedindex = typecombobox.getSelectedIndex();
+      typeMode="slice";
+      if(selectedindex == 1) typeMode="max projection";
+
+      selectedindex = viewcombobox.getSelectedIndex();
+      viewMode=iiv.data.CNUDimensions.CORONAL;
+      viewModeArray=new int[] {viewMode};
+      if(selectedindex == 1) {
+        viewMode=iiv.data.CNUDimensions.SAGITTAL;
+	viewModeArray[0] = viewMode;
+      }
+      else if(selectedindex == 2) {
+        viewMode=iiv.data.CNUDimensions.TRANSVERSE;
+	viewModeArray[0] = viewMode;
+      }
+      else if(selectedindex == 3) {
+        viewMode=iiv.data.CNUDimensions.UNKNOWN;
+        viewModeArray=new int[] {iiv.data.CNUDimensions.TRANSVERSE, iiv.data.CNUDimensions.SAGITTAL,
+			  	 iiv.data.CNUDimensions.CORONAL};
+      }
+
+      selectedindex=topcolormapcombobox.getSelectedIndex();
+      topcm=petcm;
+      if(selectedindex == 1) topcm=regcm;
+      else if(selectedindex == 2) topcm=ctcm;
+
+      selectedindex=bottomcolormapcombobox.getSelectedIndex();
+      bottomcm=petcm;
+      if(selectedindex == 1) bottomcm=regcm;
+      else if(selectedindex == 2) bottomcm=ctcm;
+
+      topsubdirectory = topdircombobox.getSelectedItem();
+      bottomsubdirectory = bottomdircombobox.getSelectedItem();
+
+      topext = topextcombobox.getSelectedItem();
+      bottomext = bottomextcombobox.getSelectedItem();
+
+      selectedindex = crosstrackcombobox.getSelectedIndex();
+      crosshairmode = "none";
+      if(selectedindex == 0) crosshairmode="cross/track";
+      else if(selectedindex == 1) crosshairmod="cross";
+      else if(selectedindex == 2) crosshairmod="track";
+
+      for( int i=0; i < actionlist.length; i++ ) {
+        sublist = actionlist[i];
+        filedir = "/data/luria/experiments/brownfat/" + sublist.study + "/";
+	if(modeMode != "bottom") {
+	  topfilenam = sublist.study + sublist.topseries + topext;
+	  topfile = CNUVIEWER.getDataOrImage(filedir+topsubdirectory+topfilenam);
+	  topdims=topfile.getDimensions();
+	  if(topcm == petcm) {
+	    topscale = petscale.ScaleDuplicate();
+	    topscale.setToDisplayPositive(topdims.getType());
+	  }
+	  else if(topcm == ctcm) {
+	    topscale = ctscale.ScaleDuplicate();
+  	    topscale.setToDisplayPositive(bottomdims.getType());
+	    topscale.setToFitDataInRange(0,4000,0,255,false);
+	  }
+	  else if(topcm == regcm) topscale = regscale.ScaleDuplicate();
+	  topcoormapname = filedir + "combined_originals/" + sublist.study + sublist.topmap;
+	  topcoordinatemap = newFileObject(topcoormapname, "iiv.data.LinearCoordinateMap", topcoormapname);
+	}
+	if(modeMode != "top") {
+          bottomfilenam = sublist.study + sublist.bottomseries + bottomext;
+	  bottomfile = CNUVIEWER.getDataOrImage(filedir+bottomsubdirectory+bottomfilenam);
+	  bottomdims=bottomfile.getDimensions();
+	  if(bottomcm == petcm) {
+	    bottomscale = petscale.ScaleDuplicate();
+	    bottomscale.setToDisplayPositive(topdims.getType());
+	  }
+	  else if(bottomcm == ctcm) {
+	    bottomscale = ctscale.ScaleDuplicate();
+  	    bottomscale.setToDisplayPositive(bottomdims.getType());
+	    bottomscale.setToFitDataInRange(0,4000,0,255,false);
+	  }
+	  else if(bottomcm == regcm) topscale = regscale.ScaleDuplicate();
+	  bottomcoormapname = filedir + "combined_originals/" + sublist.study + sublist.bottommap;
+	  bottomcoordinatemap = newFileObject(bottomcoormapname, "iiv.data.LinearCoordinateMap", bottomcoormapname);
+	}
+	if(modeMode == "topoverlaybottom") {
+	  overlaylabeltext=sublist.study + sublist.topseries + topext + "[" + sublist.bottomseries + "]";
+          if(topcm == petcm) topscale.setThreshMin(petoverlayminvalue, topscale.getThreshMinValue());
+	  bldoverlay(topfile, topcoordinatemap, topscale, topcm.getTransparentColorModel(0), 
+	  	     bottomfile, bottomcoordinatemap, bottomscale, bottomcm, null, new int[] {0,0,0,0},
+		     overlaylabeltext, viewMode);
+	}
+	else for(int j=0; j<viewModeArray.length; j++) {
+	  if(modeMode == "top" || modeMode == "both") {
+	    if(typeMode == "max projection") singleimg = new iiv.display.IntensityProjectionImage(topfile, viewModeArray[j], -1, -1, 0, topscale);
+	    else singleimg = new iiv.display.SingleImg(topfile, viewModeArray[j], 0, 0, topscale);
+	    singleimg.setColorModel(topcm);
+	    singleimg.setCoordinateMap(topcoordinatemap);
+	    resx=topdims.getSpatialRes(0); resy=topdims.getSpatialRes(1); resz=topdims.getSpatialRes(2);
+	    vzoom = hzoom = 1.0d;
+	    if(viewModeArray[j] == iiv.data.CNUDimensions.CORONAL) {
+	      if(resz > resx) vzoom = resz/resx;
+	      else if(resx < resz) hzoom = resx/resz;
+	    }
+	    else if(viewModeArray[j] == iiv.data.CNUDimensions.SAGITTAL) {
+	      if(resz > resy) vzoom = resz/resy;
+	      else if(resy < resz) hzoom = resy/resz;
+	    }
+	    else {
+	      if(resy > resx) vzoom = resy/resx;
+	      else if(resx < resy) hzoom = resx/resy;
+	    }
+	    singleimg.setZoom(vzoom,hzoom);
+	    groupimages = new java.util.Vector();
+	    groupimages.addElement(singleimg);
+	    label = new javax.swing.JLabel(sublist.study + sublist.topseries+topext);
+            label.setForeground(java.awt.Color.WHITE);
+	    groupimages.addElement(label);
+	    // add crosshairs and tracking
+	    if(crosshairmode == "cross/track") {
+	      showpointcontroller.addSliceTracker(singleimg);
+	      showpointcontroller.addCrosshairTracker(singleimg);
+	    }
+	    else if(crosshairmode == "cross") showpointcontroller.addCrosshairTracker(singleimg);
+	    else if(crosshairmode == "track") showpointcontroller.addSliceTracker(singleimg);
+	    CNUVIEWER.displayImageData(new iiv.display.ComponentGroup(groupimages, grouplocations));
+	  }
+	  if(modeMode == "bottom" || modeMode == "both") {
+	    if(typeMode == "max projection") singleimg = new iiv.display.IntensityProjectionImage(bottomfile, viewModeArray[j], -1, -1, 0, bottomscale);
+	    else singleimg = new iiv.display.SingleImg(bottomfile, viewModeArray[j], 0, 0, bottomscale);
+	    singleimg.setColorModel(bottomcm);
+	    singleimg.setCoordinateMap(bottomcoordinatemap);
+	    // zoom to square things up
+	    resx=bottomdims.getSpatialRes(0); resy=bottomdims.getSpatialRes(1); resz=bottomdims.getSpatialRes(2);
+	    vzoom = hzoom = 1.0d;
+	    if(viewModeArray[j] == iiv.data.CNUDimensions.CORONAL) {
+	      if(resz > resx) vzoom = resz/resx;
+	      else if(resx < resz) hzoom = resx/resz;
+	    }
+	    else if(viewModeArray[j] == iiv.data.CNUDimensions.SAGITTAL) {
+	      if(resz > resy) vzoom = resz/resy;
+	      else if(resy < resz) hzoom = resy/resz;
+	    }
+	    else {
+	      if(resy > resx) vzoom = resy/resx;
+	      else if(resx < resy) hzoom = resx/resy;
+	    }
+	    singleimg.setZoom(vzoom,hzoom);
+	    // group with label and add to display
+	    groupimages = new java.util.Vector();
+	    groupimages.addElement(singleimg);
+	    label = new javax.swing.JLabel(sublist.study + sublist.bottomseries);
+            label.setForeground(java.awt.Color.WHITE);
+	    groupimages.addElement(label);
+	    // add crosshairs and tracking
+	    if(crosshairmode == "cross/track") {
+	      showpointcontroller.addSliceTracker(singleimg);
+	      showpointcontroller.addCrosshairTracker(singleimg);
+	    }
+	    else if(crosshairmode == "cross") showpointcontroller.addCrosshairTracker(singleimg);
+	    else if(crosshairmode == "track") showpointcontroller.addSliceTracker(singleimg);
+	    CNUVIEWER.displayImageData(new iiv.display.ComponentGroup(groupimages, grouplocations));
+	  }
+        }
+      }
+    };
+};
+
+button.addActionListener(actionlistener);
+jlist.clearSelection();
+listDialog.setTitle( "Select Views");
+
+// make this dialog available from iiV dialog list -- a way to find it if hidden
+CNUVIEWER.addDialog(listDialog, true);
+
+listDialog.setVisible(true);
+
+return;
+

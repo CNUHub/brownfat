@@ -1,0 +1,148 @@
+// iiVBshScript
+// Version 1.183
+
+// a iiV beanshell script to help record brain extents and locations from images displayed in iiV
+
+recordbutton = new javax.swing.JButton("Record Point");
+cropbutton = new javax.swing.JButton("Apply as cropping");
+savebutton = new javax.swing.JButton("Save Bounds");
+saverecordbutton = new javax.swing.JButton("Save Record");
+resetbutton = new javax.swing.JButton("Reset");
+typecombobox = new javax.swing.JComboBox(new String[] {"unknown", "ear1", "ear2", "throat1", "chin1", "adipose", "adipose/clavicle", "brainstem", "spinal_cord", "mouth", "nasal", "eye", "ignore/edge"});
+typecombobox.setEditable(true);
+resultsarea = new javax.swing.JTextArea(5,20);
+//resultsarea.setText("results");
+resultsarea.setEditable(false);
+
+recordarea = new javax.swing.JTextArea(5,20);
+//recordarea.setText("recording all points\n");
+
+initialized=false;
+int xb, xe, yb, ye, zb, ze;
+
+recordDialog = new javax.swing.JDialog() {
+    super(CNUVIEWER.getParentFrame(), "record dialog", false);   
+    box = javax.swing.Box.createVerticalBox();
+    hbox = javax.swing.Box.createHorizontalBox();
+    hbox.add(typecombobox);
+    hbox.add(recordbutton);
+    box.add(hbox);
+    box.add(new javax.swing.JLabel("select a point"));
+    box.add(resultsarea);
+    hbox = javax.swing.Box.createHorizontalBox();
+    hbox.add(cropbutton);
+    hbox.add(savebutton);
+    box.add(hbox);
+    hbox = javax.swing.Box.createHorizontalBox();
+    hbox.add(saverecordbutton);
+    hbox.add(resetbutton);
+    box.add(hbox);
+    JScrollPane scrollPane = new JScrollPane();
+    scrollPane.getViewport().setView(recordarea);
+    box.add(scrollPane);
+    getContentPane().add(box);
+    this.pack();
+};
+recordDialog.setTitle("Record extents");
+
+public void applycropstocomponents(java.awt.Component[] comps) {
+  for(i=0; i<comps.length; i++) {
+    comp = comps[i];
+    if(comp instanceof iiv.display.ComponentGroup) {
+      applycropstocomponents(comp.getComponents());
+    }
+    else if(comp instanceof iiv.display.SingleImg) {
+      rect = new java.awt.Rectangle(0,0,0,0);
+      switch(comp.getSliceViewMode()) {
+      case iiv.data.CNUDimensions.TRANSVERSE:
+        rect.setLocation(xb,yb);
+	rect.add(xe,ye);
+        break;
+      case iiv.data.CNUDimensions.CORONAL:
+        rect.setLocation(xb,zb);
+	rect.add(xe,ze);
+        break;
+      case iiv.data.CNUDimensions.SAGITTAL:
+        rect.setLocation(yb,zb);
+	rect.add(ye,ze);
+        break;
+      }
+      CNUVIEWER.setCropBox(rect, true);
+      CNUDISPLAY.applyToComponents(CNUDISPLAY.CROP, new java.awt.Component[] {comp});
+    }
+  }
+};
+
+resetactionlistener = new java.awt.event.ActionListener() {
+  public void actionPerformed(java.awt.event.ActionEvent e) {
+    source = e.getSource();
+    if(source == resetbutton) {
+      initialized = false;
+      resultsarea.setText("");
+      recordarea.setText("");
+    }
+    else if(source == cropbutton) {
+      applycropstocomponents(CNUDISPLAY.getSelectedComponentsOrdered());
+    }
+    else if(source == savebutton) {
+      fd = CNUVIEWER.getSaveFileDialog(null);
+      fd.setVisible(true);
+      if(fd.getFile() != null) {
+        file = new iiv.io.CNUFile(fd.getDirectory() + fd.getFile());
+	pw = file.getPrintWriter();
+	pw.print(resultsarea.getText());
+	pw.close();
+      }
+    }
+    else if(source == saverecordbutton) {
+      fd = CNUVIEWER.getSaveFileDialog(null);
+      fd.setVisible(true);
+      if(fd.getFile() != null) {
+        file = new iiv.io.CNUFile(fd.getDirectory() + fd.getFile());
+	pw = file.getPrintWriter();
+	pw.print(recordarea.getText());
+	pw.close();
+      }
+    }
+    else if(source == recordbutton) {
+      comp = CNUDISPLAY.getCurrentComponent();
+       spi = null;
+       if(comp instanceof iiv.display.ShowPointImage) spi = comp;
+       if(spi != null) {
+         indices = spi.getCrosshairIndices();
+      	 value = spi.getValue(indices);
+      	 name = spi.getName();
+      	 recordarea.append("x=" + indices[0] + " y=" + indices[1] + " z=" + indices[2] + " value=" + value + " type=" + typecombobox.getSelectedItem() + " name=" + name + "\n");
+      	 if(initialized == false) {
+           xb = indices[0]; xe = indices[0];
+           yb = indices[1]; ye = indices[1];
+           zb = indices[2]; ze = indices[2];
+	   initialized = true;
+      	 } else {
+           if( indices[0] > xe ) xe = indices[0];
+	   else if( indices[0] < xb ) xb=indices[0];
+           if( indices[1] > ye ) ye=indices[1];
+	   else if( indices[1] < yb ) yb=indices[1];
+           if( indices[2] > ze ) ze=indices[2];
+	   else if( indices[2] < zb ) zb=indices[2];
+      	 }
+      	 resultsarea.setText("-xb " + xb + " -xe " + xe + "\n" +
+			    "-yb " + yb + " -ye " + ye + "\n" +
+			    "-zb " + zb + " -ze " + ze + "\n");
+       }
+     }
+  };
+};
+recordbutton.addActionListener(resetactionlistener);
+resetbutton.addActionListener(resetactionlistener);
+cropbutton.addActionListener(resetactionlistener);
+savebutton.addActionListener(resetactionlistener);
+saverecordbutton.addActionListener(resetactionlistener);
+
+// make this dialog available from iiV dialog list -- a way to find it if hidden
+CNUVIEWER.addDialog(recordDialog, true);
+
+recordDialog.setVisible(true);
+return;
+
+// end recordextents

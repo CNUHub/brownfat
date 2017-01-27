@@ -1,0 +1,198 @@
+// iiVBshScript bldoverlay command
+public void bldoverlay(iiv.data.CNUData topdata, iiv.data.CoordinateMap topmap, iiv.data.CNUScale topscale,
+    iiv.display.CNUColorModel topcolormodel,
+    iiv.data.CNUData botdata, iiv.data.CoordinateMap botmap, iiv.data.CNUScale botscale, iiv.display.CNUColorModel botcolormodel,
+    iiv.data.XYZDouble inxyzpt, int[] defaultindices, String imagetitle) {
+  bldoverlay(topdata, topmap, topscale, topcolormodel, botdata, botmap, botscale, botcolormodel, inxyzpt, defaultindices, imagetitle, iiv.data.CNUDimensions.UNKNOWN);
+}
+public void bldoverlay(iiv.data.CNUData topdata, iiv.data.CoordinateMap topmap, iiv.data.CNUScale topscale,
+    iiv.display.CNUColorModel topcolormodel,
+    iiv.data.CNUData botdata, iiv.data.CoordinateMap botmap, iiv.data.CNUScale botscale, iiv.display.CNUColorModel botcolormodel,
+    iiv.data.XYZDouble inxyzpt, int[] defaultindices, String imagetitle, int viewMode) {
+
+    showpointcontroller = CNUVIEWER.getShowPointController();
+    showpointcontroller.setMapTracking(true);
+//    CNUDISPLAY.clearAllSelections();
+//    CNUVIEWER.setSelectAdditions(true);
+
+    groupimages = new java.util.Vector();
+    // three elements at same location for each overlay
+    grouplocations = new java.util.Vector();
+    grouplocations.addElement(new java.awt.Point(0,0));
+    grouplocations.addElement(new java.awt.Point(0,0));
+    if(imagetitle != null) grouplocations.addElement(new java.awt.Point(0,0));
+
+    // bvalues needed for bot
+    botdims = botdata.getDimensions();
+    botres = new iiv.data.XYZDouble(botdims.getSpatialResolutions(), 0);
+    // values needed for top
+    topdims = topdata.getDimensions();
+    topres = new iiv.data.XYZDouble(topdims.getSpatialResolutions(), 0);
+    // default mapped local from defaultindices over top image((0,0,0) will more likely then be on both)
+    if(inxyzpt == null) inxyzpt = topmap.toSpace(new iiv.data.XYZDouble(defaultindices, 0), topres);
+    toppoint=null;
+    botpoint=null;
+    // vertical zoom for sagittal and coronal view
+    vzoom = botres.z/botres.x;
+    // corrections for resolution differences
+    res_scalematrix = iiv.data.AffineMatrix.buildScale(topres.x/botres.x,topres.y/botres.y,topres.z/botres.z);
+
+    if(viewMode == iiv.data.CNUDimensions.TRANSVERSE || viewMode == iiv.data.CNUDimensions.UNKNOWN) {
+      // create transverse view of bot image
+      botsingleimg = new iiv.display.SingleImg(botdata, botdims.TRANSVERSE, defaultindices[2], 0, botscale);
+      botsingleimg.setColorModel(botcolormodel);
+      botsingleimg.setCoordinateMap(botmap);
+      botsingleimg.setZoom(1.0d, 1.0d);
+      if(botpoint == null) botpoint = showpointcontroller.getMappedPoint(botsingleimg, inxyzpt, defaultindices);
+      botsingleimg.setSlice(botsingleimg.getSlice(botpoint));
+
+      //add to componentgroup
+      groupimages.addElement(botsingleimg);
+
+      // create transverse view of top image
+      topsingleimg = new iiv.display.SingleImg(topdata, botsingleimg.getSliceViewMode(), defaultindices[2], 0, topscale);
+      topsingleimg.setColorModel(topcolormodel);
+      topsingleimg.setCoordinateMap(topmap);
+
+      // build data slicer to show top same size and res as bottom
+      // correction of origin differences
+      botorig = botmap.toSpace(new iiv.data.XYZDouble(botsingleimg.getIndicesFromNonfilteredPoint(new Point(0, 0)), 0), botres);
+      toporig = topmap.toSpace(new iiv.data.XYZDouble(topsingleimg.getIndicesFromNonfilteredPoint(new Point(0, 0)), 0), topres);
+      // formula implemented by next few lines lines:  xyzshift = (botorig - toporig)/botres;
+      xyzshift = new iiv.data.XYZDouble(toporig);
+      //xyzshift.scale(-1.0); xyzshift.add(botorig); xyzshift.scale(1.0/botres.x, 1.0/botres.y, 1.0/botres.z);
+      xyzshift.scale(-1.0); xyzshift.add(botorig); xyzshift.scale(1.0/botres.x, 1.0/botres.y, 1.0/botres.z);
+
+      // transverse dataslicer to display top as same size and res as bot
+      topdataslicer = new iiv.data.AffineDataSlicer(topdims, res_scalematrix, botdims, xyzshift,
+		   topsingleimg.getSliceViewMode(),
+		   topsingleimg.getDataSlicer().getSliceDimensions().getType());
+
+      topsingleimg.setDataSlicer(topdataslicer);
+      topsingleimg.setZoom(1.0d, 1.0d);
+
+      if(toppoint == null) toppoint = showpointcontroller.getMappedPoint(topsingleimg, inxyzpt, defaultindices);
+
+      topsingleimg.setSlice(topsingleimg.getSlice(toppoint));
+      topsingleimg.setCrosshair(toppoint, java.awt.Color.RED);
+
+      groupimages.addElement(topsingleimg);
+      if(imagetitle != null) {
+        label = new javax.swing.JLabel(imagetitle);
+        label.setForeground(java.awt.Color.WHITE);
+        groupimages.addElement(label);
+      }
+
+      CNUVIEWER.getUndoRedo().startSteps();
+      displayImageData(new iiv.display.ComponentGroup(groupimages, grouplocations));
+      showpointcontroller.addSliceTracker(botsingleimg);
+      showpointcontroller.addSliceTracker(topsingleimg);
+      showpointcontroller.addCrosshairTracker(topsingleimg);
+      CNUVIEWER.getUndoRedo().finishUndoSteps("bldoverlay transverse");
+
+      groupimages.removeAllElements();
+    }
+    if(viewMode == iiv.data.CNUDimensions.CORONAL || viewMode == iiv.data.CNUDimensions.UNKNOWN) {
+      //
+      // create and display coronal view of bottom image
+      botsingleimg = new iiv.display.SingleImg(botdata, botdims.CORONAL, defaultindices[1], 0, botscale);
+      botsingleimg.setColorModel(botcolormodel);
+      botsingleimg.setCoordinateMap(botmap);
+      botsingleimg.setZoom(vzoom, 1.0d);
+      if(botpoint == null) botpoint = showpointcontroller.getMappedPoint(botsingleimg, inxyzpt, defaultindices);
+      botsingleimg.setSlice(botsingleimg.getSlice(botpoint));
+      groupimages.addElement(botsingleimg);
+
+      //
+      // create coronal view of top image
+      topsingleimg = new iiv.display.SingleImg(topdata, botsingleimg.getSliceViewMode(), defaultindices[1], 0, topscale);
+      topsingleimg.setColorModel(topcolormodel);
+      topsingleimg.setCoordinateMap(topmap);
+
+      // build data slicer to show top same size and res as bottom
+      // correction of origin differences
+      botorig = botmap.toSpace(new iiv.data.XYZDouble(botsingleimg.getIndicesFromNonfilteredPoint(new Point(0, 0)), 0), botres);
+      toporig = topmap.toSpace(new iiv.data.XYZDouble(topsingleimg.getIndicesFromNonfilteredPoint(new Point(0, 0)), 0), topres);
+      // formula implemented by next few lines lines:  xyzshift = (botorig - toporig)/botres;
+      xyzshift = new iiv.data.XYZDouble(toporig);
+      xyzshift.scale(-1.0); xyzshift.add(botorig); xyzshift.scale(1.0/botres.x, 1.0/botres.y, 1.0/botres.z);
+
+      // coronal dataslicer to display top as same size and res as bot
+      topdataslicer = new iiv.data.AffineDataSlicer(topdims, res_scalematrix, botdims, xyzshift,
+		   topsingleimg.getSliceViewMode(),
+		   topsingleimg.getDataSlicer().getSliceDimensions().getType());
+      topsingleimg.setDataSlicer(topdataslicer);
+      topsingleimg.setZoom(vzoom, 1.0d);
+
+      if(toppoint == null) toppoint = showpointcontroller.getMappedPoint(topsingleimg, inxyzpt, defaultindices);
+
+      topsingleimg.setSlice(topsingleimg.getSlice(toppoint));
+      topsingleimg.setCrosshair(toppoint, java.awt.Color.RED);
+      groupimages.addElement(topsingleimg);
+      if(imagetitle != null) {
+        label = new javax.swing.JLabel(imagetitle);
+        label.setForeground(java.awt.Color.WHITE);
+        groupimages.addElement(label);
+      }
+      CNUVIEWER.getUndoRedo().startSteps();
+      displayImageData(new iiv.display.ComponentGroup(groupimages, grouplocations));
+      showpointcontroller.addSliceTracker(botsingleimg);
+      showpointcontroller.addSliceTracker(topsingleimg);
+      showpointcontroller.addCrosshairTracker(topsingleimg);
+      CNUVIEWER.getUndoRedo().finishUndoSteps("bldoverlay coronal");
+
+      groupimages.removeAllElements();
+    }
+    if(viewMode == iiv.data.CNUDimensions.SAGITTAL || viewMode == iiv.data.CNUDimensions.UNKNOWN) {
+      //
+      // create and display sagittal view of bottom image
+      botsingleimg = new iiv.display.SingleImg(botdata, botdims.SAGITTAL, defaultindices[0], 0, botscale);
+      botsingleimg.setColorModel(botcolormodel);
+      botsingleimg.setCoordinateMap(botmap);
+      botsingleimg.setZoom(vzoom, 1.0d);
+      if(botpoint == null) botpoint = showpointcontroller.getMappedPoint(botsingleimg, inxyzpt, defaultindices);
+      botsingleimg.setSlice(botsingleimg.getSlice(botpoint));
+      groupimages.addElement(botsingleimg);
+
+      // create sagittal view of top image
+      topsingleimg = new iiv.display.SingleImg(topdata, botsingleimg.getSliceViewMode(), defaultindices[0], 0, topscale);
+      topsingleimg.setColorModel(topcolormodel);
+      topsingleimg.setCoordinateMap(topmap);
+
+      // build data slicer to show top same size and res as bottom
+      // correction of origin differences
+      botorig = botmap.toSpace(new iiv.data.XYZDouble(botsingleimg.getIndicesFromNonfilteredPoint(new Point(0, 0)), 0), botres);
+      toporig = topmap.toSpace(new iiv.data.XYZDouble(topsingleimg.getIndicesFromNonfilteredPoint(new Point(0, 0)), 0), topres);
+      // formula implemented by next few lines lines:  xyzshift = (botorig - toporig)/botres;
+      xyzshift = new iiv.data.XYZDouble(toporig);
+      xyzshift.scale(-1.0); xyzshift.add(botorig); xyzshift.scale(1.0/botres.x, 1.0/botres.y, 1.0/botres.z);
+
+      // sagittal dataslicer to display top as same size and res as bot
+      topdataslicer = new iiv.data.AffineDataSlicer(topdims, res_scalematrix, botdims, xyzshift,
+		   topsingleimg.getSliceViewMode(),
+		   topsingleimg.getDataSlicer().getSliceDimensions().getType());
+      topsingleimg.setDataSlicer(topdataslicer);
+      topsingleimg.setZoom(vzoom, 1.0d);
+
+      if(toppoint == null) toppoint = showpointcontroller.getMappedPoint(topsingleimg, inxyzpt, defaultindices);
+
+      topsingleimg.setSlice(topsingleimg.getSlice(toppoint));
+      topsingleimg.setCrosshair(toppoint, java.awt.Color.RED);
+
+      groupimages.addElement(topsingleimg);
+      if(imagetitle != null) {
+        label = new javax.swing.JLabel(imagetitle);
+        label.setForeground(java.awt.Color.WHITE);
+        groupimages.addElement(label);
+      }
+      CNUVIEWER.getUndoRedo().startSteps();
+      displayImageData(new iiv.display.ComponentGroup(groupimages, grouplocations));
+      showpointcontroller.addSliceTracker(botsingleimg);
+      showpointcontroller.addSliceTracker(topsingleimg);
+      showpointcontroller.addCrosshairTracker(topsingleimg);
+      CNUVIEWER.getUndoRedo().finishUndoSteps("bldoverlay sagittal");
+
+      groupimages.removeAllElements();
+    }
+};
+// end
