@@ -1,0 +1,3 @@
+time: 10:28:39 date: 07/10/12
+command: bldshape -size 336,336,93,1 common/z93cylindertemplate -cyl 167.5,167.5,2,150\
+ -uchar -fg 1 -bg 0
